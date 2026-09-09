@@ -1,5 +1,5 @@
 ---
-title: "Gjengroing / Woody enchroachment"
+title: "Gjengroing / Woody encroachment"
 subtitle: '[NO_GJEN_002]'
 format: 
   html:
@@ -15,13 +15,16 @@ author:
     affiliations:
       - id: myID
         name: The Norwegian Institute for Nature Research (NINA) # Enter affiliations
+  - name: Vegar Bakkestuen
+    affiliations:
+      - ref: myID
   - name: Ida M. Mienna                #  Enter subsequent authors like this, or remove if not relevant
     affiliations:
       - ref: myID        
   - name: Zander Venter                #  Enter subsequent authors like this, or remove if not relevant
     affiliations:
       - ref: myID              # To reuse affiliations referecen the id like this
-date: October 10, 2024 # Enter date 
+date: September 8, 2026
 callout-icon: false
 execute: 
   cache: true
@@ -45,7 +48,6 @@ library(sf)
 library(tidyverse)
 library(gridExtra)
 library(RColorBrewer)
-library(flextable)
 library(dplyr)
 library(ggpubr)
 library(flextable)
@@ -55,18 +57,48 @@ library(jsonlite)
 library(viridisLite) 
 library(patchwork)
 library(magick)
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 
-# conditional path
-dir <- substr(getwd(), 1,3)
-p_path <- switch(dir, "C:/" = "P:/", "/da" = "/data/P-Prosjekter2/")
-r_path <- switch(dir, "C:/" = "R:/", "/da" = "/data/R/")
+# Repository-local paths. External NINA roots can be overridden with
+# NINA_P_PROJECTS_ROOT and NINA_R_DATA_ROOT.
+indicator_dir <- here::here("indicators", "NO_GJEN_002")
+data_dir <- file.path(indicator_dir, "data")
+image_dir <- file.path(indicator_dir, "img")
+output_dir <- file.path(data_dir, "tiles")
+
+p_root <- Sys.getenv(
+  "NINA_P_PROJECTS_ROOT",
+  unset = if (dir.exists("/data/P-Prosjekter2")) "/data/P-Prosjekter2" else "P:/"
+)
+r_root <- Sys.getenv(
+  "NINA_R_DATA_ROOT",
+  unset = if (dir.exists("/data/R")) "/data/R" else "R:/"
+)
 
 ```
 
 ```{r source}
 #| echo: false
-source(here::here("_common.R"))
+# Legacy status callout helper kept locally so this document does not depend on
+# a missing repository-root `_common.R` file.
+status <- function(type) {
+  descriptions <- c(
+    complete = "complete, and indicator values can be calculated as described below.",
+    incomplete = "incomplete and needs further development before indicator values can be calculated.",
+    deprecated = "describing an indicator that is deprecated."
+  )
+  classes <- c(complete = "note", incomplete = "warning", deprecated = "important")
+  colors <- c(complete = "lightgreen", incomplete = "orange", deprecated = "salmon")
+
+  if (!type %in% names(descriptions)) {
+    stop("Invalid indicator status: ", type, call. = FALSE)
+  }
+
+  cat(sprintf(
+    "\n::: {.callout-%s style=\"background: %s;\"}\nThis indicator is %s\n:::\n",
+    classes[[type]], colors[[type]], descriptions[[type]]
+  ))
+}
 ```
 
 ```{r}
@@ -136,6 +168,9 @@ status(st)
 
 ::: callout-note
 ## Logg
+- 08 Sep. 2026 - Prepared v0.1.0 for internal NINA code review; fixed paths,
+  spatial joins, inference tensor handling and scaling safeguards; added
+  Vegar Bakkestuen as author
 - 11 Oct. 2024 - Original PR
 - 21 Oct. 2024 - Reviewed by Anders Kolstad
 - 22 Oct. 2024 - Slightly revised version
@@ -159,7 +194,7 @@ meta |>
 </details>
 
 
-# Gjengroing / Woody enchroachment
+# Gjengroing / Woody encroachment
 
 ::: callout-warning
 ## In review
@@ -184,13 +219,13 @@ This workbook presents the necessary steps to download image tiles, run the mode
 In this proof-of-concept, the indicator is calculated over a small number of areas / polygons.
 However, also in he future the indicator can probably only be calculated for specific areas of interest in Norway, and not wall-to-wall.
 This is due to compute and data storage limitations of handling national-scale airborne datasets.
-The indicator can, however, in the future be calculated for a representative sample of ecosystem occurrences, 
+In the future, the indicator can be calculated for a representative sample of ecosystem occurrences,
 for example the ASO or GRUK polygons, or new ground-truthing polygons from new nature monitoring programs that are currently under development.
 
-The canopy height estimated with the meta model show a relatively good agreement with the canopy heights from LiDAR (R^2^= 0.58), with possibly a slight bias towards taller canopies. 
-Although the indicator values may be inprecise at the level of individual points, and may individual polygons,
-this also tells us that the indicator will be quite sufficient to estimate indicator values at bigger spatial scales, such as from municipalities to regional scale.
-These is, however, a need for the reference levels to be recalculated based on the meta model. The current version *borrows*'* the reference levels from the LiDAR approach, which as was mentioned, could be systematically lower.
+Canopy heights estimated with the Meta model show reasonably good agreement with LiDAR canopy heights (R^2^ = 0.58), with a possible bias towards taller canopies.
+Although indicator values may be imprecise for individual points and polygons,
+the results suggest that the approach may be suitable for estimates at larger spatial scales, from municipalities to regions.
+The reference levels must, however, be recalculated using the Meta model. The current version borrows reference levels from the LiDAR approach, which may be systematically lower.
 
 
 ## 2. About the underlying data
@@ -207,7 +242,7 @@ We rely on the following datasets:
 
 ### 2.1 Spatial and temporal resolution
 
-This approach processes small image tiles over selected areas of interest and in its current form uses the most recently collected airborne image. Future itereations will include the ability to select date ranges for study. Temporal resolution presented here is circa 2019 to 2024.
+This approach processes small image tiles over selected areas of interest and, in its current form, uses the most recently collected airborne image. Future iterations will include the ability to select date ranges for study. Temporal resolution presented here is circa 2019 to 2024.
 
 ### 2.2 Original units
 
@@ -221,7 +256,7 @@ We also tested a model based on Sentinel 1 and 2 data, trained using the nationa
 
 ### 3.1. ECT
 
-Structural state characteristic (B2)
+Functional state characteristic (B3)
 
 ### 3.2. Ecosystem condition characteristic
 
@@ -235,12 +270,18 @@ The indicator is related to the *Funksjonell sammensetning innen trofiske nivåe
 
 There is possibly a collinearity with a [preliminary indicator](https://ninanor.github.io/ecosystemCondition/NDVI-indicator-natopen.html) called based on the normalized difference vegetation index (NDVI) as a proxy for vegetation production. NDVI can be correlated with vegetation height and consequently yield similar results to the gjengroing indicator.
 
-For wetlands especially, woody enchroachment is associated with trenching, which is the topic of an indicator based on [field-recorded mire trenching](https://ecoevorxiv.org/repository/view/7221/), and another indicator based on the [amount of trenching](https://ninanor.github.io/mire-trenching/) as inferred from LiDAR.
+For wetlands especially, woody encroachment is associated with trenching, which is the topic of an indicator based on [field-recorded mire trenching](https://ecoevorxiv.org/repository/view/7221/), and another indicator based on the [amount of trenching](https://ninanor.github.io/mire-trenching/) as inferred from LiDAR.
 
 ## 4. Reference condition and values
 
 ::: callout-note
 Chapter 4 is a direct quote from the documentation of NO_GJEN_001. In the future it is possible to calculate reference levels also with the meta model.
+:::
+
+::: callout-warning
+The current beta version uses LiDAR-derived reference levels from NO_GJEN_001.
+These must be recalibrated with aerial-image model output before NO_GJEN_002 can
+be considered an operational, independently calibrated indicator.
 :::
 
 ### 4. 1. Reference condition
@@ -272,7 +313,7 @@ Obs, there is an error in the figure. X~0~ is defined as the 90th percentile of 
 [NiN polygons](https://kartkatalog.miljodirektoratet.no/Dataset/Details/2031) of "Våtmark", "Naturlig åpne områder under skoggrensa" and "Semi-naturlig mark" with good ecological condition (we use the aggregated "Tilstand" variable assigned to each NiN polygon) are used as spatial references to define the optimal reference level (X~100~).
 
 ::: callout-warning
-This part is subject to change. One reviewer suggested using the field-recorded variable *rask suksesjon* instead. This variable is essentially the same as woody enchroachemnt.
+This part is subject to change. One reviewer suggested using the field-recorded variable *rask suksesjon* instead. This variable is essentially the same as woody encroachment.
 :::
 
 The 50th percentile of LiDAR-derived vegetation heights within these polygons is used as X~100~. We cannot define local reference values based on proximity, because the NiN polygons are spatially biased and not close to all population polygons. Therefore we calculate regional reference values using regions and bioclimatic zones as stratification layers. These strata exuates to homogeneous ecosystem areas sensu @vallecillo_eu-wide_2022. We calculate the mean reference value for each unique combination of region-bioclimatic zone. When calculating the indicator for each population polygon, the X~100~ reference level is inherited from the region-bioclimatic zone it falls within.
@@ -326,7 +367,6 @@ Here we define the directories to download images and image metadata (date) from
 
 ```{r}
 wms_base_url <- 'https://wms.geonorge.no/skwms1/wms.nib?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&SRS=EPSG:25833'
-output_dir <- "data/tiles"
 metadata_url <- 'https://tjenester.norgeibilder.no/rest/projectMetadata.ashx'
 if (!dir.exists(output_dir)) {
   dir.create(output_dir, recursive = TRUE)
@@ -394,11 +434,11 @@ get_most_recent_metadata <- function(metadata) {
 
 #### 7.1.3 Defining the area of interest
 
-Here we include a shapefile of our area of intertest (AOI), this is a random selection of 300 vaatmark, 300 semi naturlig and 300 natural aapne NiN polygons and includes all ecosystem condition classes. The script will loop through all features in the shapefile, calculate their extent and query the WMS to download orthophotos within that extent in 256 x 256 pixel tiles. The AOI shape file should be in EPSG:25833. The shapefile provided here is a random sample of NiN polygons intended for testing this approach. Tile size must be kept to 256 to enable image normalisation as part of the preprocessing for running the meta model. Model performance has been tested at 1 m and 0.5 m resolution, with significantly better results at 0.5 m resolution. Imagery is available at finer scales which may again improve performance, but may also require additional tuning of the model's hyperparameters for best results.
+Here we include a shapefile of our areas of interest (AOIs), a random selection of 300 wetland, 300 semi-natural and 300 naturally open NiN polygons that includes all ecosystem condition classes. The script loops through all features, calculates their extents and queries the WMS to download orthophotos in 256 × 256 pixel tiles. The AOI shapefile must use EPSG:25833. Tile size is kept at 256 × 256 pixels to support the model's image-normalisation step. Model performance has been tested at 1 m and 0.5 m resolution, with significantly better results at 0.5 m resolution. Imagery is available at finer resolutions, which may improve performance but may also require further tuning of the model hyperparameters.
 
 ```{r}
 
-AOIs <- sf::st_read(paste0(p_path, "412421_okologisk_tilstand_2024/Andrew/meta/github/ecRxiv_encroachment/indicators/NO_GJEN_002/data/AOIs.shp"),
+AOIs <- sf::st_read(file.path(data_dir, "AOIs.shp"),
   quiet = T
 )
 
@@ -532,7 +572,7 @@ mclapply(1:nrow(AOIs), function(i) {
 To use our model output as an indicator, we need to bring in some datasets to stratify our inferred canopy height statistics. The regional delineation for Norway (five regions) are used for aggregating and reporting gjengroing condition values.
 
 ```{r}
-regions <- sf::st_read(paste0(p_path, "412421_okologisk_tilstand_2024/Andrew/meta/github/ecRxiv_encroachment/indicators/NO_GJEN_002/data/regions.shp"),
+regions <- sf::st_read(file.path(data_dir, "regions.shp"),
   options = "ENCODING=UTF8",
   quiet = T
 ) %>%
@@ -544,7 +584,8 @@ regions <- sf::st_read(paste0(p_path, "412421_okologisk_tilstand_2024/Andrew/met
 The [Moen's bioclimatic regions](https://data.artsdatabanken.no//Natur_i_Norge/Natursystem/Beskrivelsessystem/Regional_naturvariasjon/Bioklimatisk_sone) are imported from NINA R/GeoSpatialData/ server.
 
 ```{r}
-bioclim <- st_read(paste0(r_path, "GeoSpatialData/BiogeographicalRegions/Norway_VegetationZones_Moen/Original/Vector/soner.shp"),
+bioclim <- st_read(file.path(r_root, "GeoSpatialData", "BiogeographicalRegions",
+                            "Norway_VegetationZones_Moen", "Original", "Vector", "soner.shp"),
   quiet = T
 ) %>%
   mutate(NAVN = ifelse(NAVN == "S°rboreal", "Sørboreal", NAVN))
@@ -579,7 +620,6 @@ from pathlib import Path
 import torch.nn as nn
 from tqdm import tqdm
 from PIL import Image
-import torchvision.transforms.functional as TF
 from torchvision.utils import save_image
 
 from models.backbone import SSLVisionTransformer
@@ -588,14 +628,7 @@ import pytorch_lightning as pl
 import rasterio
 from rasterio.transform import from_origin
 
-import torch
-import torchvision.transforms.functional as TF
-import matplotlib.pyplot as plt
 import numpy as np
-from tqdm import tqdm
-from pathlib import Path
-from PIL import Image
-import rasterio
 from models.regressor import RNet
 import torch.nn.functional as F
 
@@ -618,13 +651,14 @@ def normalize_image(image, model_norm, device, overlap=None, weight=0.5):
     p5I = [norm_img[0][0].item(), norm_img[0][1].item(), norm_img[0][2].item()]
     p95I = [norm_img[0][3].item(), norm_img[0][4].item(), norm_img[0][5].item()]
 
-    p5In = [np.percentile(image[i, :, :].numpy(), 20) for i in range(3)]
-    p95In = [np.percentile(image[i, :, :].numpy(), 80) for i in range(3)]
+    input_low = [np.percentile(image[i, :, :].cpu().numpy(), 20) for i in range(3)]
+    input_high = [np.percentile(image[i, :, :].cpu().numpy(), 80) for i in range(3)]
 
     normIn = image.clone()
     
     for i in range(3):
-        normIn[i, :, :] = (image[i, :, :] - p5In[i]) * ((p95I[i] - p5I[i]) / (p95In[i] - p5In[i])) + p5I[i]
+        input_range = max(input_high[i] - input_low[i], np.finfo(np.float32).eps)
+        normIn[i, :, :] = (image[i, :, :] - input_low[i]) * ((p95I[i] - p5I[i]) / input_range) + p5I[i]
     
     # If overlap region is provided, blend the overlap
     if overlap is not None:
@@ -708,17 +742,14 @@ def evaluate(model, model_norm, norm_values, name, bs=32, device='cuda:0', displ
     for batch in tqdm(dataloader):
         images, img_paths = batch
 
-        # Convert list of images to a single tensor
-        images = torch.stack(images).to(device)
-
-        # Ensure the dimensions are in the correct order (channels first)
-        images = images.permute(0, 2, 3, 1)  
+        # Dataset returns channels-first tensors: batch, channel, height, width.
+        images = torch.stack(images)
 
         # Step 1: Apply histogram normalization (matching satellite images)
         images = torch.stack([normalize_image(img, model_norm, device) for img in images])
 
         # Step 2: Apply final normalization (standard image normalization)
-        images = torch.stack([final_normalize(img, norm_values) for img in images])
+        images = torch.stack([final_normalize(img, norm_values) for img in images]).to(device)
 
         pred = model(images)
         pred = pred.cpu().detach().relu()
@@ -762,12 +793,12 @@ class NorwayDataset(torch.utils.data.Dataset):
         
         # Use rasterio to read the GeoTIFF
         with rasterio.open(img_path) as src:
-            img = TF.to_tensor(src.read([1, 2, 3]))  
+            img = torch.from_numpy(src.read([1, 2, 3]).astype(np.float32) / 255.0)
         
         # Check if the image is all zeros
         if torch.all(img == 0):
             print(f"Skipping all-zero tile: {img_path}")
-            return self.__getitem__((i + 1) % len(self.img_files))  # Get the next image
+            raise ValueError(f"All-zero image tile cannot be processed: {img_path}")
 
         return img, img_path
 
@@ -776,16 +807,16 @@ def parse_args():
     parser = argparse.ArgumentParser(description='test a model')
     parser.add_argument('--checkpoint', type=str, help='CHM pred checkpoint file', default='saved_checkpoints/compressed_SSLhuge_aerial.pth') # this should be set to the location where the model was installed
     parser.add_argument('--name', type=str, help='run name', default='data/output_inference')
-    parser.add_argument('--display', type=bool, help='saving outputs in images')
+    parser.add_argument('--display', action='store_true', help='display predictions')
     args = parser.parse_args()
     return args
 
 def main():
     args = parse_args()
-    if 'compressed' in args.checkpoint:
-        device = 'cpu'
-    else:
-        device = 'cpu'
+    # Dynamically quantized checkpoints run on CPU. Other checkpoints may use CUDA.
+    device = 'cpu' if 'compressed' in args.checkpoint else (
+        'cuda:0' if torch.cuda.is_available() else 'cpu'
+    )
 
     os.makedirs(args.name, exist_ok=True)
 
@@ -822,7 +853,7 @@ if __name__ == '__main__':
 Here we import a shapefile of the areas of interest used to download image tiles. QGIS has been used to perform zonal statistics to calculate the median and maximum canopy height, calculated from both Meta model inference and LiDAR data, for each NiN feature.
 
 ```{r}
-metaChm <- st_read(paste0(p_path, "412421_okologisk_tilstand_2024/Andrew/meta/github/ecRxiv_encroachment/indicators/NO_GJEN_002/data/NiN_metaTest.shp"),
+metaChm <- st_read(file.path(data_dir, "NiN_metaTest.shp"),
                    quiet = T)
 ```
 
@@ -833,45 +864,21 @@ Here we add the region and bioclimate zone information to stratifiy the dataset
 ```{r}
 library(dplyr)
 
-# Calculate the intersection between polygons and climatic zones
-main_climatic_overlap <- st_intersects(metaChm, bioclim)
+# Assign the zone and region with the largest overlapping area. Counting
+# intersecting features can select the wrong class for polygons at boundaries.
+metaChm <- st_join(
+  metaChm,
+  bioclim %>% dplyr::select(vegClimZone = KLASSE),
+  left = TRUE,
+  largest = TRUE
+)
 
-# Extract the modal climatic zone for each polygon
-metaChm$bioclim <- sapply(main_climatic_overlap, function(zones) {
-  if (length(zones) > 0) {
-    # Get the climatic zone IDs for overlapping polygons
-    zone_ids <- bioclim$KLASSE[zones]
-    
-    # Find the most common climatic zone (modal value)
-    zone_modal <- names(sort(table(zone_ids), decreasing = TRUE))[1]
-    
-    return(zone_modal)
-  } else {
-    return(NA)  # No overlap case
-  }
-})
-
-# Calculate the intersection between polygons and regions
-main_region_overlap <- st_intersects(metaChm, regions)
-
-# Extract the modal (most common) region for each polygon
-metaChm$regions <- sapply(main_region_overlap, function(regs) {
-  if (length(regs) > 0) {
-    # Get the region IDs for overlapping polygons
-    region_ids <- regions$id[regs]
-    
-    # Find the most common region (modal value)
-    region_modal <- names(sort(table(region_ids), decreasing = TRUE))[1]
-    
-    return(region_modal)
-  } else {
-    return(NA)  # No overlap case
-  }
-})
-
-# Rename 'bioclim' to 'vegClimZone'
-metaChm <- metaChm %>%
-  rename(vegClimZone = bioclim)
+metaChm <- st_join(
+  metaChm,
+  regions %>% dplyr::select(regions = id),
+  left = TRUE,
+  largest = TRUE
+)
 
 # Add the region and vegClimZone labels
 vegLookup <- tibble(
@@ -922,7 +929,10 @@ cleanRegClim <- function(data){
 }
 
 
-skog_region_bioclim <- read_csv(paste0(p_path, "412421_okologisk_tilstand_2024/Ida/From_GEE/vegHeights_skog_climZoneRegion.csv"))
+skog_region_bioclim <- read_csv(file.path(
+  p_root, "412421_okologisk_tilstand_2024", "Ida", "From_GEE",
+  "vegHeights_skog_climZoneRegion.csv"
+))
 
 
 names(skog_region_bioclim)[2:4] <- c("vegClimZone","skog","region_id")
@@ -954,9 +964,9 @@ metaChm <- metaChm %>%
 Import the reference height data to be used as "good" condition reference values
 
 ```{r}
-refvaatmark  <- read.csv(paste0(p_path, '412421_okologisk_tilstand_2024/Andrew/meta/github/ecRxiv_encroachment/indicators/NO_GJEN_002/data/refvaatmark.csv'), sep = ",")
-refaapne  <- read.csv(paste0(p_path, '412421_okologisk_tilstand_2024/Andrew/meta/github/ecRxiv_encroachment/indicators/NO_GJEN_002/data/refaapne.csv'), sep = ";")
-refsemi  <- read.csv(paste0(p_path, '412421_okologisk_tilstand_2024/Andrew/meta/github/ecRxiv_encroachment/indicators/NO_GJEN_002/data/refsemi.csv'), sep = ",")
+refvaatmark <- read.csv(file.path(data_dir, "refvaatmark.csv"), sep = ",")
+refaapne <- read.csv(file.path(data_dir, "refaapne.csv"), sep = ";")
+refsemi <- read.csv(file.path(data_dir, "refsemi.csv"), sep = ",")
 
 ```
 
@@ -1018,11 +1028,18 @@ We will calculate the gjengroing indicator for each population polygon using a S
 ```{r}
 # Define Sigmoid scaling function
 scaleSigmoid <- function(pop, ref, skog) {
+  if (length(pop) != length(ref) || length(pop) != length(skog)) {
+    stop("pop, ref and skog must have equal lengths")
+  }
+
   # Scale the population height between the reference (good condition) and forest height (poor condition)
-  indicator_LowHigh <- (pop - ref) / (skog - ref)
-  indicator_LowHigh[indicator_LowHigh < 0] <- 0
-  indicator_LowHigh[indicator_LowHigh > 1] <- 1
+  denominator <- skog - ref
+  invalid <- !is.finite(pop) | !is.finite(ref) | !is.finite(skog) |
+    denominator <= 0
+  indicator_LowHigh <- (pop - ref) / denominator
+  indicator_LowHigh <- pmin(pmax(indicator_LowHigh, 0), 1)
   indicator_sigmoid <- 100.68 * (1 - exp(-5 * (indicator_LowHigh)^2.5)) / 100
+  indicator_sigmoid[invalid] <- NA_real_
   return(round(indicator_sigmoid, 4))
 }
 ```
@@ -1069,9 +1086,9 @@ After running inference on the meta model, we have raster tiles of canopy height
 ```{r}
 #| eval: false
 
-rgb_img <- stack(paste0(p_path, "412421_okologisk_tilstand_2024/Andrew/meta/github/ecRxiv_encroachment/indicators/NO_GJEN_002/img/TileID_4.tif"))  
-pred_img <- raster(paste0(p_path, "412421_okologisk_tilstand_2024/Andrew/meta/github/ecRxiv_encroachment/indicators/NO_GJEN_002/img/TileID_4_pred.tif"))
-lidar_img <- raster(paste0(p_path, "412421_okologisk_tilstand_2024/Andrew/meta/github/ecRxiv_encroachment/indicators/NO_GJEN_002/img/TileID_4_LiDAR_2017.tif"))  
+rgb_img <- raster::stack(file.path(image_dir, "TileID_4.tif"))
+pred_img <- raster::raster(file.path(image_dir, "TileID_4_pred.tif"))
+lidar_img <- raster::raster(file.path(image_dir, "TileID_4_LiDAR_2017.tif"))
 
 rgb_df <- as.data.frame(rgb_img, xy = TRUE)
 pred_df <- as.data.frame(pred_img, xy = TRUE)
@@ -1112,7 +1129,7 @@ print(combined_plot)
 ```{r fig-threeImages}
 #| fig-cap: "Three images of the same area showing the aerial (RGB) image (left), the canopy height model based on the meta model (centre) and the LiDAR approach (right). Click to enlarge."
 #| lightbox: true
-img <- image_read(paste0(p_path, "412421_okologisk_tilstand_2024/Andrew/meta/github/ecRxiv_encroachment/indicators/NO_GJEN_002/img/tileComparison.png"))
+img <- image_read(file.path(image_dir, "tileComparison.png"))
 
 plot(img)
 ```
@@ -1127,7 +1144,7 @@ The validation based on these values gave a reasonable agreement between canopy 
 ```{r fig-scatter}
 #| message: false
 #| fig-cap: "Comparison of canopy height estimated by either LiDAR or the meta model. n = 39877. "
-val <- read.csv(paste0(p_path, "412421_okologisk_tilstand_2024/Andrew/meta/github/ecRxiv_encroachment/indicators/NO_GJEN_002/data/NiNpointSamples.csv"))
+val <- read.csv(file.path(data_dir, "NiNpointSamples.csv"))
 ggplot(val, aes(x = lidmax, y = metamax)) +
   geom_point(size=2.5, alpha=0.2, stroke=0, color = 'darkgray') +  # Scatter plot
   geom_smooth(method = "lm", se = FALSE, color = "darkblue") +  # Line of best fit
